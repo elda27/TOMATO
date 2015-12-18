@@ -24,23 +24,27 @@ int main(void)
 	namedWindow("hough", CV_WINDOW_AUTOSIZE);
 	int low_H = 240,
 		low_S = 7,
-		low_V = 80,
-		high_H = 200,
+		low_V = 160,
+		high_H = 237,
 		high_S = 5,
 		high_V = 255;
 
+	int tomatos_prev = 0, tomatos_next = 0, alltomatos = 0;
 
-/*	createTrackbar("low_H", "dst", &low_H, 255);
+
+	createTrackbar("low_H", "dst", &low_H, 255);
 	createTrackbar("low_S", "dst", &low_S, 255);
 	createTrackbar("low_V", "dst", &low_V, 255);
 	createTrackbar("high_H", "dst", &high_H, 255);
 	createTrackbar("high_S", "dst", &high_S, 255);
 	createTrackbar("high_V", "dst", &high_V, 255);
-*/
+
 	
-	int houghP1 = 110, houghP2 = 25;
-	createTrackbar("param1", "frame", &houghP1, 255);
-	createTrackbar("param2", "frame", &houghP2, 255);
+
+	Mat frame, src, dst, hough;
+	video >> src;
+	Mat mask(src.size(), src.type(), Scalar::all(0));
+	circle(mask, Point(mask.rows / 2, mask.cols / 2), mask.rows / 2 - 10, cv::Scalar::all(255), -1);
 
 	while (!GetAsyncKeyState(VK_ESCAPE))
 	{
@@ -48,20 +52,11 @@ int main(void)
 		{
 			video.set(CV_CAP_PROP_POS_MSEC, video.get(CV_CAP_PROP_POS_MSEC) + 10000);
 		}
-		Mat frame, dst, hough;
-		video >> frame;
-		for (int y = 0; y < frame.rows; ++y)
-		{
-			for (int x = 0; x < frame.cols; ++x)
-			{
-				if (sqrt(pow(y - frame.rows / 2, 2) + pow(x - frame.cols / 2, 2)) > (frame.rows/2-30))
-				{
-					cv::Vec3b &pixel = frame.at<cv::Vec3b>(y, x);
-					pixel = Vec3b(0, 0, 0);
-				}
-			}
-		}
-		if (frame.empty() || video.get(CV_CAP_PROP_POS_AVI_RATIO) == 1)		break;
+
+		video >> src;
+		if (src.empty() || video.get(CV_CAP_PROP_POS_AVI_RATIO) == 1)		break;
+		src.copyTo(frame, mask);
+
 		cv::resize(frame, frame, cv::Size(), 0.5, 0.5);
 		colorExtraction(&frame, &dst, CV_BGR2HSV, low_H, low_S, low_V, high_H, high_S, high_V);
 		cvtColor(dst, hough, CV_BGR2GRAY);
@@ -94,20 +89,27 @@ int main(void)
 				
 			}
 		}
-		cout << "labels = " << nLabels << endl;
-		vector<Vec3f> circles;
-		HoughCircles(hough, circles, CV_HOUGH_GRADIENT, 2, hough.rows / 4, houghP1, houghP2);
-		
-		for (size_t i = 0; i < circles.size(); i++)
+
+		tomatos_next = 0;
+		for (int x = 1; x < frame.cols; x++)
 		{
-			Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
-			int radius = cvRound(circles[i][2]);
-			// ‰~‚Ì’†S‚ð•`‰æ‚µ‚Ü‚·D
-			circle(frame, center, 3, Scalar(0, 255, 0), -1, 8, 0);
-			// ‰~‚ð•`‰æ‚µ‚Ü‚·D
-			circle(frame, center, radius, Scalar(0, 0, 255), 3, 8, 0);
+			int label_prev = labelImage.at<int>(frame.rows / 2, x - 1);
+			int label_next = labelImage.at<int>(frame.rows / 2, x);
+			if (label_prev != label_next)
+			{
+				tomatos_next++;
+			}
 		}
 
+		tomatos_next /= 2;
+
+		if (tomatos_prev > tomatos_next)
+		{
+			alltomatos += tomatos_prev - tomatos_next;
+			cout << "tomatos = " << alltomatos << endl;
+		}
+
+		tomatos_prev = tomatos_next;
 
 		imshow("frame", frame);
 		imshow("dst", dst);
